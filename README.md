@@ -2,7 +2,7 @@
 
 Real-time dashboard for monitoring and managing [Clawdbot](https://github.com/clawdbot/clawdbot) AI agents.
 
-<!-- TODO: Add screenshot
+<!-- Screenshot -->
 ![Clawd Control Dashboard](docs/screenshot.png)
 -->
 
