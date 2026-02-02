@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cost Analytics — Clawd Control</title>
+<style>
+/* ═══════════════════════════════════════════
+   ANALYTICS — Page-specific styles
+   Layout, sidebar, topbar, theme, design system
+   provided by layout.js
+   ═══════════════════════════════════════════ */
+
+/* ── Page Layout ───────────────────────── */
+.page-header {
+  margin-bottom: 24px;
+}
+.page-header h1 {
+  font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em;
+  display: flex; align-items: center; gap: 10px;
+}
+.page-header p {
+  font-size: 0.82rem; color: var(--text-tertiary); margin-top: 4px;
+}
+
+/* ── Stats Grid ────────────────────────── */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px; margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 14px 16px;
+  transition: all 0.35s ease;
+}
+.stat-card:hover { border-color: var(--border); }
+[data-theme="light"] .stat-card { box-shadow: var(--shadow-sm); }
+.stat-label {
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-tertiary); margin-bottom: 4px; font-weight: 600;
+}
+.stat-value {
+  font-size: 1.5rem; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value.accent { color: var(--accent); }
+.stat-value.success { color: var(--success); }
+.stat-value.info { color: var(--info); }
+.stat-sub { font-size: 0.7rem; color: var(--text-tertiary); margin-top: 4px; }
+
+/* ── Controls Bar ──────────────────────── */
+.controls {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 16px; padding: 12px 16px;
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.control-group { display: flex; align-items: center; gap: 6px; }
+.control-label {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-tertiary);
+}
+.control-select {
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  background: var(--bg-primary); border: 1px solid var(--border-subtle);
+  color: var(--text-primary); font-family: var(--font-sans);
+  font-size: 0.8rem; cursor: pointer;
+}
+.control-select:focus { border-color: var(--accent); outline: none; }
+
+/* ── Chart Containers ──────────────────── */
+.chart-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; margin-bottom: 12px;
+}
+.chart-card {
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 16px;
+  transition: all 0.35s ease;
+}
+.chart-card:hover { border-color: var(--border); }
+[data-theme="light"] .chart-card { box-shadow: var(--shadow-sm); }
+
+.chart-card-full {
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 16px;
+  margin-bottom: 12px;
+}
+
+.chart-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);
+}
+.chart-title {
+  font-size: 0.85rem; font-weight: 700; color: var(--text-primary);
+  display: flex; align-items: center; gap: 6px;
+}
+.chart-subtitle {
+  font-size: 0.7rem; color: var(--text-tertiary);
+}
+
+/* ── Bar Chart (CSS) ───────────────────── */
+.bar-chart { display: flex; flex-direction: column; gap: 8px; min-height: 200px; }
+.bar-item { display: flex; align-items: center; gap: 8px; }
+.bar-label {
+  font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);
+  min-width: 80px; text-align: right; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.bar-track {
+  flex: 1; height: 24px; background: var(--bg-primary);
+  border-radius: var(--radius-sm); overflow: hidden; position: relative;
+}
+.bar-fill {
+  height: 100%; border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 8px; font-size: 0.7rem; font-weight: 700;
+  color: var(--bg-primary); transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 32px;
+}
+.bar-value {
+  font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--text-primary); min-width: 50px; text-align: right;
+}
+
+/* ── Line Chart (Canvas) ───────────────── */
+.line-chart-container { position: relative; height: 200px; }
+.line-chart { width: 100%; height: 100%; }
+
+/* ── Token Breakdown (Pie-style bars) ──── */
+.token-breakdown { display: flex; flex-direction: column; gap: 10px; }
+.token-item { display: flex; flex-direction: column; gap: 4px; }
+.token-header { display: flex; justify-content: space-between; align-items: center; }
+.token-label { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
+.token-value { font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.token-bar {
+  height: 8px; border-radius: 4px; background: var(--bg-primary);
+  overflow: hidden;
+}
+.token-fill {
+  height: 100%; border-radius: 4px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.token-fill.input { background: #3b82f6; }
+.token-fill.output { background: #22c55e; }
+.token-fill.cache { background: #c9a44a; }
+
+/* ── Session List ──────────────────────── */
+.session-list { display: flex; flex-direction: column; gap: 6px; }
+.session-list-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 10px; background: var(--bg-primary);
+  border-radius: var(--radius-sm); font-size: 0.78rem;
+  transition: background 0.2s;
+}
+.session-list-item:hover { background: var(--bg-secondary); }
+.session-agent {
+  font-weight: 600; color: var(--text-primary);
+  display: flex; align-items: center; gap: 6px;
+}
+.session-agent-emoji { font-size: 1rem; }
+.session-meta {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.7rem; color: var(--text-tertiary);
+}
+.session-cost {
+  font-weight: 700; color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.session-tokens {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Model Distribution (CSS Donut) ────── */
+.model-distribution { display: flex; flex-direction: column; gap: 8px; }
+.model-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--border-subtle);
+}
+.model-item:last-child { border-bottom: none; }
+.model-color {
+  width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+}
+.model-name {
+  flex: 1; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);
+}
+.model-percent {
+  font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* ── Loading State ─────────────────────── */
+.loading-state {
+  text-align: center; padding: 40px 20px; color: var(--text-tertiary);
+}
+.loading-state .icon { font-size: 2rem; margin-bottom: 12px; opacity: 0.4; }
+.loading-state p { font-size: 0.85rem; }
+
+/* ── Empty State ───────────────────────── */
+.empty-state {
+  text-align: center; padding: 40px 20px; color: var(--text-secondary);
+}
+.empty-state .icon { font-size: 2rem; margin-bottom: 12px; opacity: 0.4; }
+.empty-state p { font-size: 0.85rem; }
+
+/* ── Responsive ────────────────────────── */
+@media (max-width: 900px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-row { grid-template-columns: 1fr; }
+}
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.fade-up { animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <div class="page-header fade-up">
+    <h1>📊 Cost Analytics</h1>
+    <p>Token usage and cost breakdown across all agents</p>
+  </div>
+
+  <div class="controls fade-up" style="animation-delay:.05s">
+    <div class="control-group">
+      <span class="control-label">Time Range</span>
+      <select class="control-select" id="rangeSelect" onchange="loadAnalytics()">
+        <option value="7">Last 7 Days</option>
+        <option value="30">Last 30 Days</option>
+        <option value="90">Last 90 Days</option>
+        <option value="all">All Time</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <span class="control-label">Agent</span>
+      <select class="control-select" id="agentSelect" onchange="loadAnalytics()">
+        <option value="all">All Agents</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="stats-grid fade-up" style="animation-delay:.1s">
+    <div class="stat-card">
+      <div class="stat-label">Total Cost</div>
+      <div class="stat-value accent" id="statTotalCost">—</div>
+      <div class="stat-sub" id="statCostSub">Loading...</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Tokens</div>
+      <div class="stat-value info" id="statTotalTokens">—</div>
+      <div class="stat-sub" id="statTokensSub">All messages</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">API Calls</div>
+      <div class="stat-value success" id="statApiCalls">—</div>
+      <div class="stat-sub" id="statCallsSub">Messages sent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Cache Hits</div>
+      <div class="stat-value" style="color: var(--accent)" id="statCacheHits">—</div>
+      <div class="stat-sub" id="statCacheSub">Token reads</div>
+    </div>
+  </div>
+
+  <div class="chart-row fade-up" style="animation-delay:.15s">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">
+          <i data-lucide="bar-chart-3"></i>
+          Cost by Agent
+        </div>
+      </div>
+      <div id="costByAgentChart" class="bar-chart">
+        <div class="loading-state">
+          <div class="icon">⏳</div>
+          <p>Loading data...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">
+          <i data-lucide="pie-chart"></i>
+          Token Breakdown
+        </div>
+      </div>
+      <div id="tokenBreakdownChart" class="token-breakdown">
+        <div class="loading-state">
+          <div class="icon">⏳</div>
+          <p>Loading data...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card-full fade-up" style="animation-delay:.2s">
+    <div class="chart-header">
+      <div class="chart-title">
+        <i data-lucide="trending-up"></i>
+        Cost Over Time
+      </div>
+      <div class="chart-subtitle" id="costTimeSubtitle">Daily breakdown</div>
+    </div>
+    <div class="line-chart-container">
+      <canvas id="costOverTimeChart" class="line-chart"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-row fade-up" style="animation-delay:.25s">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">
+          <i data-lucide="flame"></i>
+          Top Expensive Sessions
+        </div>
+      </div>
+      <div id="topSessionsList" class="session-list">
+        <div class="loading-state">
+          <div class="icon">⏳</div>
+          <p>Loading sessions...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">
+          <i data-lucide="cpu"></i>
+          Model Distribution
+        </div>
+      </div>
+      <div id="modelDistributionChart" class="model-distribution">
+        <div class="loading-state">
+          <div class="icon">⏳</div>
+          <p>Loading models...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script src="/layout.js"></script>
+<script>
+'use strict';
+
+const $ = s => document.querySelector(s);
+let analyticsData = null;
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+
+document.addEventListener('layout:snapshot', () => {
+  populateAgentSelect();
+  loadAnalytics();
+});
+
+function populateAgentSelect() {
+  const select = $('#agentSelect');
+  const ids = Object.keys(agentState).sort();
+  const agentOptions = ids.map(id => {
+    const a = agentState[id];
+    return `<option value="${id}">${a.emoji || '🤖'} ${a.name || id}</option>`;
+  }).join('');
+  select.innerHTML = '<option value="all">All Agents</option>' + agentOptions;
+}
+
+// ═══════════════════════════════════════════
+// LOAD ANALYTICS DATA
+// ═══════════════════════════════════════════
+
+async function loadAnalytics() {
+  const range = $('#rangeSelect').value;
+  const agent = $('#agentSelect').value;
+
+  try {
+    const res = await fetch(`/api/analytics?range=${range}&agent=${agent}`);
+    analyticsData = await res.json();
+    renderAll();
+  } catch (e) {
+    console.error('Failed to load analytics:', e);
+    showToast('Failed to load analytics data', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════
+// RENDER ALL CHARTS
+// ═══════════════════════════════════════════
+
+function renderAll() {
+  if (!analyticsData) return;
+
+  renderStats();
+  renderCostByAgent();
+  renderTokenBreakdown();
+  renderCostOverTime();
+  renderTopSessions();
+  renderModelDistribution();
+
+  refreshIcons();
+}
+
+function renderStats() {
+  const d = analyticsData;
+
+  $('#statTotalCost').textContent = d.totalCost > 0 ? `$${d.totalCost.toFixed(2)}` : '$0.00';
+  $('#statCostSub').textContent = d.range === 'all' ? 'All time' : `Last ${d.range} days`;
+
+  $('#statTotalTokens').textContent = formatNumber(d.totalTokens);
+  $('#statTokensSub').textContent = `${formatNumber(d.inputTokens + d.outputTokens)} in/out`;
+
+  $('#statApiCalls').textContent = formatNumber(d.apiCalls);
+  $('#statCallsSub').textContent = 'Messages sent';
+
+  $('#statCacheHits').textContent = formatNumber(d.cacheReadTokens);
+  $('#statCacheSub').textContent = d.cacheReadTokens > 0 ? `${Math.round(d.cacheReadTokens / d.totalTokens * 100)}% of total` : 'No cache hits';
+}
+
+function renderCostByAgent() {
+  const container = $('#costByAgentChart');
+  const agents = analyticsData.byAgent;
+
+  if (!agents || agents.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No cost data</p></div>';
+    return;
+  }
+
+  const maxCost = Math.max(...agents.map(a => a.cost));
+
+  container.innerHTML = agents.map(a => {
+    const pct = maxCost > 0 ? (a.cost / maxCost * 100) : 0;
+    const agentInfo = agentState[a.agentId] || {};
+    const emoji = agentInfo.emoji || '🤖';
+    const name = agentInfo.name || a.agentId;
+    return `
+      <div class="bar-item">
+        <div class="bar-label" title="${name}">${emoji} ${truncate(name, 10)}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${pct}%">$${a.cost.toFixed(2)}</div>
+        </div>
+        <div class="bar-value">${formatNumber(a.tokens)} tok</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTokenBreakdown() {
+  const container = $('#tokenBreakdownChart');
+  const d = analyticsData;
+
+  const total = d.inputTokens + d.outputTokens + d.cacheReadTokens;
+  if (total === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No token data</p></div>';
+    return;
+  }
+
+  const items = [
+    { label: 'Input Tokens', value: d.inputTokens, class: 'input' },
+    { label: 'Output Tokens', value: d.outputTokens, class: 'output' },
+    { label: 'Cache Reads', value: d.cacheReadTokens, class: 'cache' },
+  ];
+
+  container.innerHTML = items.map(item => {
+    const pct = (item.value / total * 100).toFixed(1);
+    return `
+      <div class="token-item">
+        <div class="token-header">
+          <span class="token-label">${item.label}</span>
+          <span class="token-value">${formatNumber(item.value)} (${pct}%)</span>
+        </div>
+        <div class="token-bar">
+          <div class="token-fill ${item.class}" style="width:${pct}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderCostOverTime() {
+  const canvas = $('#costOverTimeChart');
+  const ctx = canvas.getContext('2d');
+  const timeline = analyticsData.overTime || [];
+
+  if (timeline.length === 0) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-tertiary');
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
+    return;
+  }
+
+  // Responsive canvas sizing
+  const parent = canvas.parentElement;
+  canvas.width = parent.clientWidth * 2; // 2x for retina
+  canvas.height = parent.clientHeight * 2;
+  canvas.style.width = parent.clientWidth + 'px';
+  canvas.style.height = parent.clientHeight + 'px';
+  ctx.scale(2, 2);
+
+  const w = parent.clientWidth;
+  const h = parent.clientHeight;
+  const padding = { top: 20, right: 20, bottom: 30, left: 50 };
+  const chartW = w - padding.left - padding.right;
+  const chartH = h - padding.top - padding.bottom;
+
+  // Get CSS colors
+  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim();
+  const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border-subtle').trim();
+
+  // Find max cost for scaling
+  const maxCost = Math.max(...timeline.map(d => d.cost), 0.01);
+
+  // Draw grid lines
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + (chartH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(padding.left + chartW, y);
+    ctx.stroke();
+
+    // Y-axis labels
+    const value = maxCost * (1 - i / 4);
+    ctx.fillStyle = textColor;
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`$${value.toFixed(2)}`, padding.left - 8, y + 3);
+  }
+
+  // Draw line and area
+  const points = timeline.map((d, i) => {
+    const x = padding.left + (chartW / (timeline.length - 1 || 1)) * i;
+    const y = padding.top + chartH - (d.cost / maxCost * chartH);
+    return { x, y, cost: d.cost, date: d.date };
+  });
+
+  // Area fill
+  ctx.fillStyle = accentColor + '20'; // 20% opacity
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, padding.top + chartH);
+  points.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(points[points.length - 1].x, padding.top + chartH);
+  ctx.closePath();
+  ctx.fill();
+
+  // Line
+  ctx.strokeStyle = accentColor;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.stroke();
+
+  // Points
+  points.forEach(p => {
+    ctx.fillStyle = accentColor;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // X-axis labels (show every few days to avoid crowding)
+  ctx.fillStyle = textColor;
+  ctx.font = '10px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(timeline.length / 7));
+  timeline.forEach((d, i) => {
+    if (i % step === 0 || i === timeline.length - 1) {
+      const x = points[i].x;
+      const label = formatDate(d.date);
+      ctx.fillText(label, x, padding.top + chartH + 18);
+    }
+  });
+}
+
+function renderTopSessions() {
+  const container = $('#topSessionsList');
+  const sessions = analyticsData.topSessions || [];
+
+  if (sessions.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No sessions found</p></div>';
+    return;
+  }
+
+  container.innerHTML = sessions.slice(0, 8).map(s => {
+    const agentInfo = agentState[s.agentId] || {};
+    const emoji = agentInfo.emoji || '🤖';
+    const name = agentInfo.name || s.agentId;
+    return `
+      <div class="session-list-item">
+        <div class="session-agent">
+          <span class="session-agent-emoji">${emoji}</span>
+          <span>${truncate(name, 12)}</span>
+        </div>
+        <div class="session-meta">
+          <span class="session-tokens">${formatNumber(s.tokens)} tok</span>
+          <span class="session-cost">$${s.cost.toFixed(3)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderModelDistribution() {
+  const container = $('#modelDistributionChart');
+  const models = analyticsData.byModel || [];
+
+  if (models.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No model data</p></div>';
+    return;
+  }
+
+  const total = models.reduce((sum, m) => sum + m.tokens, 0);
+  const colors = ['#3b82f6', '#22c55e', '#c9a44a', '#ef4444', '#8b5cf6', '#f59e0b'];
+
+  container.innerHTML = models.slice(0, 6).map((m, i) => {
+    const pct = (m.tokens / total * 100).toFixed(1);
+    const color = colors[i % colors.length];
+    const cleanModel = m.model.replace('anthropic/', '').replace('openai/', '');
+    return `
+      <div class="model-item">
+        <div class="model-color" style="background:${color}"></div>
+        <div class="model-name">${truncate(cleanModel, 20)}</div>
+        <div class="model-percent">${pct}%</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+
+function formatNumber(n) {
+  if (n > 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n > 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${month}/${day}`;
+}
+
+function truncate(str, max) {
+  if (str.length <= max) return str;
+  return str.slice(0, max - 1) + '…';
+}
+
+</script>
+<script src="/lucide.min.js"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>

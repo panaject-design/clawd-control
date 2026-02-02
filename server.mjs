@@ -351,6 +351,204 @@ function getAgentDetail(agentId) {
   };
 }
 
+// ── Analytics Aggregator ────────────────────────────
+import { homedir } from 'os';
+
+function getAnalytics(rangeStr, agentFilter) {
+  const AGENTS_DIR = join(homedir(), '.clawdbot', 'agents');
+  const range = rangeStr === 'all' ? Infinity : parseInt(rangeStr);
+  const cutoffDate = rangeStr === 'all' ? 0 : Date.now() - (range * 86400000);
+
+  // Aggregate data structures
+  let totalCost = 0;
+  let totalTokens = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let apiCalls = 0;
+
+  const byAgent = new Map(); // agentId -> {cost, tokens}
+  const byDate = new Map(); // date -> {cost, tokens}
+  const byModel = new Map(); // model -> {cost, tokens}
+  const sessions = []; // [{agentId, sessionId, cost, tokens}]
+
+  // Discover all agents
+  let agentIds = [];
+  try {
+    agentIds = readdirSync(AGENTS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+  } catch {
+    // No agents dir
+  }
+
+  // Filter agents if needed
+  if (agentFilter !== 'all') {
+    agentIds = agentIds.filter(id => id === agentFilter);
+  }
+
+  // Parse sessions for each agent
+  for (const agentId of agentIds) {
+    const sessDir = join(AGENTS_DIR, agentId, 'sessions');
+    if (!existsSync(sessDir)) continue;
+
+    try {
+      const files = readdirSync(sessDir).filter(
+        f => f.endsWith('.jsonl') && !f.includes('.deleted.') && !f.includes('.archived.')
+      );
+
+      for (const file of files) {
+        const sessionId = file.replace('.jsonl', '');
+        const sessionPath = join(sessDir, file);
+        
+        // Check file mtime - skip if too old
+        try {
+          const stat = statSync(sessionPath);
+          if (stat.mtimeMs < cutoffDate) continue;
+        } catch {
+          continue;
+        }
+
+        // Parse session efficiently (read only what we need)
+        let sessionCost = 0;
+        let sessionTokens = 0;
+        let sessionInput = 0;
+        let sessionOutput = 0;
+        let sessionCache = 0;
+        let sessionCalls = 0;
+        let sessionModel = null;
+
+        try {
+          const content = readFileSync(sessionPath, 'utf8');
+          const lines = content.split('\n').filter(l => l.trim());
+
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line);
+
+              // Model tracking
+              if (data.type === 'model_change' && data.modelId) {
+                sessionModel = data.modelId;
+              }
+
+              // Message cost extraction
+              if (data.type === 'message' && data.message) {
+                const msg = data.message;
+                const usage = msg.usage || {};
+
+                // Check timestamp
+                const ts = data.timestamp || msg.timestamp;
+                if (ts && ts < cutoffDate) continue;
+
+                // Track costs
+                const cost = usage.cost?.total || 0;
+                const input = usage.input || 0;
+                const output = usage.output || 0;
+                const cache = usage.cacheRead || 0;
+
+                sessionCost += cost;
+                sessionTokens += input + output + cache;
+                sessionInput += input;
+                sessionOutput += output;
+                sessionCache += cache;
+
+                if (msg.role === 'user') {
+                  sessionCalls++;
+                }
+
+                // Track by date
+                if (ts) {
+                  const date = new Date(ts).toISOString().split('T')[0];
+                  if (!byDate.has(date)) {
+                    byDate.set(date, { cost: 0, tokens: 0 });
+                  }
+                  const d = byDate.get(date);
+                  d.cost += cost;
+                  d.tokens += input + output + cache;
+                }
+
+                // Track by model
+                if (sessionModel) {
+                  if (!byModel.has(sessionModel)) {
+                    byModel.set(sessionModel, { cost: 0, tokens: 0 });
+                  }
+                  const m = byModel.get(sessionModel);
+                  m.cost += cost;
+                  m.tokens += input + output + cache;
+                }
+              }
+            } catch {
+              // Skip malformed lines
+            }
+          }
+        } catch {
+          // Skip broken files
+        }
+
+        // Aggregate totals
+        totalCost += sessionCost;
+        totalTokens += sessionTokens;
+        inputTokens += sessionInput;
+        outputTokens += sessionOutput;
+        cacheReadTokens += sessionCache;
+        apiCalls += sessionCalls;
+
+        // Track by agent
+        if (!byAgent.has(agentId)) {
+          byAgent.set(agentId, { cost: 0, tokens: 0 });
+        }
+        const a = byAgent.get(agentId);
+        a.cost += sessionCost;
+        a.tokens += sessionTokens;
+
+        // Track session for top list
+        if (sessionCost > 0 || sessionTokens > 0) {
+          sessions.push({
+            agentId,
+            sessionId,
+            cost: sessionCost,
+            tokens: sessionTokens,
+          });
+        }
+      }
+    } catch {
+      // Skip agent if sessions dir unreadable
+    }
+  }
+
+  // Sort and format results
+  const byAgentArray = Array.from(byAgent.entries())
+    .map(([agentId, data]) => ({ agentId, ...data }))
+    .sort((a, b) => b.cost - a.cost);
+
+  const byDateArray = Array.from(byDate.entries())
+    .map(([date, data]) => ({ date, ...data }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const byModelArray = Array.from(byModel.entries())
+    .map(([model, data]) => ({ model, ...data }))
+    .sort((a, b) => b.tokens - a.tokens);
+
+  const topSessions = sessions
+    .sort((a, b) => b.cost - a.cost)
+    .slice(0, 20);
+
+  return {
+    range: rangeStr,
+    agentFilter,
+    totalCost: Math.round(totalCost * 10000) / 10000,
+    totalTokens,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    apiCalls,
+    byAgent: byAgentArray,
+    overTime: byDateArray,
+    byModel: byModelArray,
+    topSessions,
+  };
+}
+
 // ── HTTP Server ─────────────────────────────────────
 
 const server = createServer((req, res) => {
@@ -472,6 +670,21 @@ const server = createServer((req, res) => {
   if (path === '/api/security-audit' && req.method === 'GET') {
     try {
       const result = runSecurityAudit();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // ── Analytics ──
+  if (path === '/api/analytics' && req.method === 'GET') {
+    try {
+      const range = url.searchParams.get('range') || '7';
+      const agentFilter = url.searchParams.get('agent') || 'all';
+      const result = getAnalytics(range, agentFilter);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
     } catch (e) {
