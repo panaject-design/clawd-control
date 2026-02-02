@@ -34,11 +34,13 @@
             ? 'tokens'
             : path === '/waterfall.html'
               ? 'waterfall'
-              : path.startsWith('/agent/')
-                ? 'agent-detail'
-                : path === '/gandalf-view.html'
-                  ? 'gandalf'
-                  : 'other';
+              : path === '/traces.html'
+                ? 'traces'
+                : path.startsWith('/agent/')
+                  ? 'agent-detail'
+                  : path === '/gandalf-view.html'
+                    ? 'gandalf'
+                    : 'other';
   const activeAgentId =
     activePage === 'agent-detail'
       ? decodeURIComponent(path.split('/').filter(Boolean).pop())
@@ -441,6 +443,10 @@ body.sidebar-collapsed .topbar { grid-column: 1 / -1; }
       <a href="/waterfall.html" class="nav-item${isActive('waterfall')}">
         <i data-lucide="activity" class="nav-icon"></i>
         <span class="nav-label">Session Waterfall</span>
+      </a>
+      <a href="/traces.html" class="nav-item${isActive('traces')}">
+        <i data-lucide="git-branch" class="nav-icon"></i>
+        <span class="nav-label">Trace View</span>
       </a>
 
       <div class="sidebar-section">Actions</div>

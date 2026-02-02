@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trace View — Clawd Control</title>
+<style>
+/* ═══════════════════════════════════════════
+   TRACES — Page-specific styles
+   Layout, sidebar, topbar, theme, design system
+   provided by layout.js
+   ═══════════════════════════════════════════ */
+
+/* ── Page Layout ───────────────────────── */
+.page-header {
+  margin-bottom: 24px;
+}
+.page-header h1 {
+  font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em;
+  display: flex; align-items: center; gap: 10px;
+}
+.page-header p {
+  font-size: 0.82rem; color: var(--text-tertiary); margin-top: 4px;
+}
+
+/* ── Stats Grid ────────────────────────── */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px; margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 14px 16px;
+  transition: all 0.35s ease;
+}
+.stat-card:hover { border-color: var(--border); }
+[data-theme="light"] .stat-card { box-shadow: var(--shadow-sm); }
+.stat-label {
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-tertiary); margin-bottom: 4px; font-weight: 600;
+}
+.stat-value {
+  font-size: 1.5rem; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value.accent { color: var(--accent); }
+.stat-value.success { color: var(--success); }
+.stat-value.info { color: var(--info); }
+.stat-sub { font-size: 0.7rem; color: var(--text-tertiary); margin-top: 4px; }
+
+/* ── Controls Bar ──────────────────────── */
+.controls {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 16px; padding: 12px 16px;
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.control-group { display: flex; align-items: center; gap: 6px; }
+.control-label {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-tertiary);
+}
+.control-select {
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  background: var(--bg-primary); border: 1px solid var(--border-subtle);
+  color: var(--text-primary); font-family: var(--font-sans);
+  font-size: 0.8rem; cursor: pointer;
+}
+.control-select:focus { border-color: var(--accent); outline: none; }
+
+.btn {
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  color: var(--text-primary); font-family: var(--font-sans);
+  font-size: 0.75rem; cursor: pointer; font-weight: 600;
+  transition: all 0.2s;
+}
+.btn:hover { background: var(--surface-hover); border-color: var(--border); }
+.btn.active { background: var(--accent); color: var(--bg-primary); border-color: var(--accent); }
+
+/* ── Visualization Container ───────────── */
+.viz-card {
+  background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 16px;
+  margin-bottom: 12px; min-height: 500px;
+}
+.viz-card:hover { border-color: var(--border); }
+[data-theme="light"] .viz-card { box-shadow: var(--shadow-sm); }
+
+.viz-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);
+}
+.viz-title {
+  font-size: 0.85rem; font-weight: 700; color: var(--text-primary);
+  display: flex; align-items: center; gap: 6px;
+}
+.viz-subtitle {
+  font-size: 0.7rem; color: var(--text-tertiary);
+}
+
+/* ── Tree Canvas ───────────────────────── */
+#treeCanvas {
+  width: 100%; height: 600px; cursor: grab;
+}
+#treeCanvas:active { cursor: grabbing; }
+
+/* ── Timeline Canvas ───────────────────── */
+#timelineCanvas {
+  width: 100%; height: 400px; cursor: grab;
+}
+#timelineCanvas:active { cursor: grabbing; }
+
+/* ── Detail Panel ──────────────────────── */
+.detail-panel {
+  background: var(--bg-primary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 16px; margin-top: 12px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.detail-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin-bottom: 12px;
+}
+
+.detail-item {
+  background: var(--surface); padding: 10px; border-radius: var(--radius-sm);
+}
+
+.detail-item-label {
+  font-size: 0.65rem; font-weight: 700; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;
+}
+
+.detail-item-value {
+  font-size: 1rem; font-weight: 700; color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-item-sub {
+  font-size: 0.7rem; color: var(--text-tertiary); margin-top: 2px;
+}
+
+.detail-section {
+  margin-top: 12px;
+}
+
+.detail-heading {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: 8px;
+}
+
+.child-list {
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+.child-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: var(--surface);
+  border-radius: var(--radius-sm); font-size: 0.78rem;
+}
+
+.child-label {
+  flex: 1; font-weight: 600; color: var(--text-primary);
+}
+
+.child-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.7rem; color: var(--text-tertiary);
+}
+
+/* ── Loading State ─────────────────────── */
+.loading-state {
+  text-align: center; padding: 60px 20px; color: var(--text-tertiary);
+}
+.loading-state .icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.4; }
+.loading-state p { font-size: 0.85rem; }
+
+/* ── Empty State ───────────────────────── */
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-secondary);
+}
+.empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.4; }
+.empty-state p { font-size: 0.85rem; }
+
+/* ── Responsive ────────────────────────── */
+@media (max-width: 900px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .detail-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.fade-up { animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <div class="page-header fade-up">
+    <h1>🌳 Session Traces</h1>
+    <p>Parent → child delegation trees showing how agents spawn sub-agents</p>
+  </div>
+
+  <div class="controls fade-up" style="animation-delay:.05s">
+    <div class="control-group">
+      <span class="control-label">View Mode</span>
+      <button class="btn active" id="btnTreeMode" onclick="setViewMode('tree')">Tree View</button>
+      <button class="btn" id="btnTimelineMode" onclick="setViewMode('timeline')">Timeline</button>
+    </div>
+    <div class="control-group">
+      <span class="control-label">Agent</span>
+      <select class="control-select" id="agentSelect" onchange="loadTraces()">
+        <option value="all">All Agents</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="stats-grid fade-up" style="animation-delay:.1s">
+    <div class="stat-card">
+      <div class="stat-label">Total Sessions</div>
+      <div class="stat-value info" id="statTotalSessions">—</div>
+      <div class="stat-sub" id="statSessionsSub">Loading...</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Subagent Spawns</div>
+      <div class="stat-value success" id="statSpawns">—</div>
+      <div class="stat-sub" id="statSpawnsSub">Delegations</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Cost</div>
+      <div class="stat-value accent" id="statTotalCost">—</div>
+      <div class="stat-sub" id="statCostSub">Across all sessions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Max Depth</div>
+      <div class="stat-value" style="color: var(--text-primary)" id="statMaxDepth">—</div>
+      <div class="stat-sub" id="statDepthSub">Delegation levels</div>
+    </div>
+  </div>
+
+  <div class="viz-card fade-up" style="animation-delay:.15s">
+    <div class="viz-header">
+      <div class="viz-title">
+        <i data-lucide="git-branch"></i>
+        <span id="vizTitle">Delegation Tree</span>
+      </div>
+      <div class="viz-subtitle" id="vizSubtitle">Click nodes to see details</div>
+    </div>
+    <div id="vizContainer">
+      <canvas id="treeCanvas"></canvas>
+      <canvas id="timelineCanvas" style="display:none"></canvas>
+    </div>
+  </div>
+
+  <div id="detailPanel" style="display:none" class="detail-panel fade-up"></div>
+
+</main>
+
+<script src="/layout.js"></script>
+<script>
+'use strict';
+
+const $ = s => document.querySelector(s);
+let tracesData = null;
+let viewMode = 'tree';
+let selectedNode = null;
+
+// Canvas state
+let pan = { x: 0, y: 0 };
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+
+// Agent colors (consistent across views)
+const agentColors = new Map();
+const colorPalette = [
+  '#3b82f6', '#22c55e', '#c9a44a', '#ef4444', '#8b5cf6', 
+  '#f59e0b', '#06b6d4', '#ec4899', '#10b981', '#f97316'
+];
+
+function getAgentColor(agentId) {
+  if (!agentColors.has(agentId)) {
+    agentColors.set(agentId, colorPalette[agentColors.size % colorPalette.length]);
+  }
+  return agentColors.get(agentId);
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+
+document.addEventListener('layout:snapshot', () => {
+  populateAgentSelect();
+  loadTraces();
+});
+
+// Also load immediately
+setTimeout(() => {
+  if (!tracesData) loadTraces();
+}, 500);
+
+function populateAgentSelect() {
+  const select = $('#agentSelect');
+  const ids = Object.keys(agentState).sort();
+  const agentOptions = ids.map(id => {
+    const a = agentState[id];
+    return `<option value="${id}">${a.emoji || '🤖'} ${a.name || id}</option>`;
+  }).join('');
+  select.innerHTML = '<option value="all">All Agents</option>' + agentOptions;
+}
+
+// ═══════════════════════════════════════════
+// LOAD TRACES DATA
+// ═══════════════════════════════════════════
+
+async function loadTraces() {
+  const agentFilter = $('#agentSelect').value;
+
+  try {
+    const res = await fetch(`/api/traces`);
+    tracesData = await res.json();
+    
+    // Filter by agent if needed
+    if (agentFilter !== 'all') {
+      tracesData.traces = tracesData.traces.filter(t => t.agentId === agentFilter);
+      // Recalculate summary
+      let totalSessions = 0;
+      let totalSubagents = 0;
+      let totalCost = 0;
+      let maxDepth = 1;
+      
+      function countTree(node, depth = 1) {
+        totalSessions++;
+        totalCost += node.cost || 0;
+        if (!node.isMain) totalSubagents++;
+        if (depth > maxDepth) maxDepth = depth;
+        for (const child of node.children || []) {
+          countTree(child, depth + 1);
+        }
+      }
+      
+      for (const root of tracesData.traces) {
+        countTree(root);
+      }
+      
+      tracesData.summary = { totalSessions, totalSubagents, totalCost, maxDepth };
+    }
+    
+    renderStats();
+    renderVisualization();
+  } catch (e) {
+    console.error('Failed to load traces:', e);
+    showToast('Failed to load trace data', 'error');
+  }
+}
+
+function renderStats() {
+  if (!tracesData) return;
+  
+  const s = tracesData.summary;
+  
+  $('#statTotalSessions').textContent = s.totalSessions;
+  $('#statSessionsSub').textContent = `${tracesData.traces.length} root sessions`;
+  
+  $('#statSpawns').textContent = s.totalSubagents;
+  $('#statSpawnsSub').textContent = s.totalSubagents === 1 ? '1 delegation' : `${s.totalSubagents} delegations`;
+  
+  $('#statTotalCost').textContent = s.totalCost > 0 ? `$${s.totalCost.toFixed(4)}` : '$0.00';
+  $('#statCostSub').textContent = 'Across all sessions';
+  
+  $('#statMaxDepth').textContent = s.maxDepth;
+  $('#statDepthSub').textContent = s.maxDepth === 1 ? 'No nesting' : `${s.maxDepth} levels deep`;
+}
+
+// ═══════════════════════════════════════════
+// VIEW MODE TOGGLE
+// ═══════════════════════════════════════════
+
+function setViewMode(mode) {
+  viewMode = mode;
+  $('#btnTreeMode').classList.toggle('active', mode === 'tree');
+  $('#btnTimelineMode').classList.toggle('active', mode === 'timeline');
+  
+  $('#treeCanvas').style.display = mode === 'tree' ? 'block' : 'none';
+  $('#timelineCanvas').style.display = mode === 'timeline' ? 'block' : 'none';
+  
+  $('#vizTitle').textContent = mode === 'tree' ? 'Delegation Tree' : 'Timeline View';
+  $('#vizSubtitle').textContent = mode === 'tree' ? 'Click nodes to see details' : 'Sessions over time';
+  
+  // Reset pan
+  pan = { x: 0, y: 0 };
+  
+  renderVisualization();
+}
+
+// ═══════════════════════════════════════════
+// RENDER VISUALIZATION
+// ═══════════════════════════════════════════
+
+function renderVisualization() {
+  if (!tracesData) return;
+  
+  if (viewMode === 'tree') {
+    renderTreeView();
+  } else {
+    renderTimelineView();
+  }
+  
+  refreshIcons();
+}
+
+// ═══════════════════════════════════════════
+// TREE VIEW
+// ═══════════════════════════════════════════
+
+function renderTreeView() {
+  const canvas = $('#treeCanvas');
+  const ctx = canvas.getContext('2d');
+  const parent = canvas.parentElement;
+  
+  // Responsive sizing
+  canvas.width = parent.clientWidth * 2;
+  canvas.height = 600 * 2;
+  canvas.style.width = parent.clientWidth + 'px';
+  canvas.style.height = '600px';
+  ctx.scale(2, 2);
+  
+  const w = parent.clientWidth;
+  const h = 600;
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, w, h);
+  
+  if (!tracesData || tracesData.traces.length === 0) {
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-tertiary');
+    ctx.font = '14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No sessions to display', w / 2, h / 2);
+    return;
+  }
+  
+  // Layout tree nodes
+  const nodes = [];
+  const nodeW = 160;
+  const nodeH = 60;
+  const hGap = 40;
+  const vGap = 80;
+  
+  function layoutTree(node, depth = 0, index = 0) {
+    const x = 50 + index * (nodeW + hGap) + pan.x;
+    const y = 50 + depth * (nodeH + vGap) + pan.y;
+    
+    const nodeData = {
+      ...node,
+      x, y, w: nodeW, h: nodeH, depth
+    };
+    nodes.push(nodeData);
+    
+    let childIndex = index * (node.children?.length || 1);
+    for (const child of node.children || []) {
+      layoutTree(child, depth + 1, childIndex);
+      childIndex++;
+    }
+  }
+  
+  let index = 0;
+  for (const root of tracesData.traces) {
+    layoutTree(root, 0, index);
+    index += 2; // Space out root trees
+  }
+  
+  // Get CSS colors
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim();
+  const textSecondary = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim();
+  const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+  
+  // Draw connections first
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  for (const node of nodes) {
+    for (const child of node.children || []) {
+      const childNode = nodes.find(n => n.key === child.key);
+      if (childNode) {
+        ctx.beginPath();
+        ctx.moveTo(node.x + nodeW / 2, node.y + nodeH);
+        ctx.lineTo(childNode.x + nodeW / 2, childNode.y);
+        ctx.stroke();
+      }
+    }
+  }
+  
+  // Draw nodes
+  for (const node of nodes) {
+    const color = getAgentColor(node.agentId);
+    const isSelected = selectedNode?.key === node.key;
+    
+    // Node background
+    ctx.fillStyle = color + (isSelected ? 'FF' : '30');
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isSelected ? 3 : 2;
+    roundRect(ctx, node.x, node.y, nodeW, nodeH, 8);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Agent emoji
+    ctx.font = '20px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = textColor;
+    ctx.fillText(node.agentEmoji, node.x + nodeW / 2, node.y + 8);
+    
+    // Session label
+    ctx.font = 'bold 11px Inter, sans-serif';
+    ctx.fillStyle = textColor;
+    ctx.fillText(truncate(node.label, 18), node.x + nodeW / 2, node.y + 32);
+    
+    // Stats
+    ctx.font = '9px Inter, sans-serif';
+    ctx.fillStyle = textSecondary;
+    const stats = `${formatNumber(node.tokens)} tok • $${(node.cost || 0).toFixed(3)}`;
+    ctx.fillText(stats, node.x + nodeW / 2, node.y + 46);
+    
+    // Store clickable area
+    node.clickArea = { x: node.x, y: node.y, w: nodeW, h: nodeH };
+  }
+  
+  // Store nodes for click detection
+  canvas._nodes = nodes;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ═══════════════════════════════════════════
+// TIMELINE VIEW
+// ═══════════════════════════════════════════
+
+function renderTimelineView() {
+  const canvas = $('#timelineCanvas');
+  const ctx = canvas.getContext('2d');
+  const parent = canvas.parentElement;
+  
+  canvas.width = parent.clientWidth * 2;
+  canvas.height = 400 * 2;
+  canvas.style.width = parent.clientWidth + 'px';
+  canvas.style.height = '400px';
+  ctx.scale(2, 2);
+  
+  const w = parent.clientWidth;
+  const h = 400;
+  
+  ctx.clearRect(0, 0, w, h);
+  
+  if (!tracesData || tracesData.traces.length === 0) {
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-tertiary');
+    ctx.font = '14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No sessions to display', w / 2, h / 2);
+    return;
+  }
+  
+  // Collect all sessions (flatten tree)
+  const allSessions = [];
+  function collectSessions(node) {
+    if (node.startTime && node.endTime) {
+      allSessions.push(node);
+    }
+    for (const child of node.children || []) {
+      collectSessions(child);
+    }
+  }
+  for (const root of tracesData.traces) {
+    collectSessions(root);
+  }
+  
+  if (allSessions.length === 0) {
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-tertiary');
+    ctx.font = '14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No timeline data available', w / 2, h / 2);
+    return;
+  }
+  
+  // Find time range
+  const minTime = Math.min(...allSessions.map(s => s.startTime));
+  const maxTime = Math.max(...allSessions.map(s => s.endTime));
+  const timeRange = maxTime - minTime;
+  
+  const padding = { left: 100, right: 40, top: 40, bottom: 40 };
+  const chartW = w - padding.left - padding.right;
+  const chartH = h - padding.top - padding.bottom;
+  
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim();
+  const textSecondary = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim();
+  const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border-subtle').trim();
+  
+  // Draw time axis
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding.left, padding.top + chartH);
+  ctx.lineTo(padding.left + chartW, padding.top + chartH);
+  ctx.stroke();
+  
+  // Draw time labels
+  ctx.fillStyle = textSecondary;
+  ctx.font = '10px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const t = minTime + (timeRange / 4) * i;
+    const x = padding.left + (chartW / 4) * i;
+    const date = new Date(t);
+    const label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    ctx.fillText(label, x, padding.top + chartH + 20);
+  }
+  
+  // Draw sessions as bars
+  const barHeight = 20;
+  const barGap = 4;
+  
+  allSessions.forEach((sess, idx) => {
+    const x = padding.left + ((sess.startTime - minTime) / timeRange) * chartW;
+    const w = ((sess.endTime - sess.startTime) / timeRange) * chartW;
+    const y = padding.top + idx * (barHeight + barGap);
+    
+    // Ensure minimum visible width
+    const barW = Math.max(w, 2);
+    
+    const color = getAgentColor(sess.agentId);
+    const isSelected = selectedNode?.key === sess.key;
+    
+    // Bar
+    ctx.fillStyle = color + (isSelected ? 'FF' : '80');
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isSelected ? 2 : 1;
+    roundRect(ctx, x, y, barW, barHeight, 4);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Label
+    ctx.fillStyle = textColor;
+    ctx.font = 'bold 9px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${sess.agentEmoji} ${truncate(sess.label, 12)}`, padding.left - 8, y + 13);
+    
+    // Store clickable area
+    sess.clickArea = { x, y, w: barW, h: barHeight };
+  });
+  
+  canvas._nodes = allSessions;
+}
+
+// ═══════════════════════════════════════════
+// CANVAS INTERACTIONS
+// ═══════════════════════════════════════════
+
+function setupCanvasInteractions(canvas) {
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Check for node click
+    const nodes = canvas._nodes || [];
+    let clicked = false;
+    for (const node of nodes) {
+      if (node.clickArea && 
+          x >= node.clickArea.x && x <= node.clickArea.x + node.clickArea.w &&
+          y >= node.clickArea.y && y <= node.clickArea.y + node.clickArea.h) {
+        selectNode(node);
+        clicked = true;
+        break;
+      }
+    }
+    
+    if (!clicked) {
+      isDragging = true;
+      dragStart = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+      canvas.style.cursor = 'grabbing';
+    }
+  });
+  
+  canvas.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+      pan.x = e.clientX - dragStart.x;
+      pan.y = e.clientY - dragStart.y;
+      renderVisualization();
+    }
+  });
+  
+  canvas.addEventListener('mouseup', () => {
+    isDragging = false;
+    canvas.style.cursor = 'grab';
+  });
+  
+  canvas.addEventListener('mouseleave', () => {
+    isDragging = false;
+    canvas.style.cursor = 'grab';
+  });
+}
+
+setupCanvasInteractions($('#treeCanvas'));
+setupCanvasInteractions($('#timelineCanvas'));
+
+// ═══════════════════════════════════════════
+// NODE SELECTION & DETAIL PANEL
+// ═══════════════════════════════════════════
+
+function selectNode(node) {
+  selectedNode = node;
+  renderVisualization();
+  showDetailPanel(node);
+}
+
+function showDetailPanel(node) {
+  const panel = $('#detailPanel');
+  
+  const duration = node.endTime && node.startTime 
+    ? formatDuration(node.endTime - node.startTime) 
+    : '—';
+  
+  const updated = node.updatedAt 
+    ? new Date(node.updatedAt).toLocaleString() 
+    : '—';
+  
+  let html = `
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-item-label">Agent</div>
+        <div class="detail-item-value">${node.agentEmoji} ${node.agentName}</div>
+        <div class="detail-item-sub">${node.isMain ? 'Main session' : 'Subagent'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Label</div>
+        <div class="detail-item-value" style="font-size:0.9rem">${node.label}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Model</div>
+        <div class="detail-item-value" style="font-size:0.85rem">${node.model}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Messages</div>
+        <div class="detail-item-value">${node.messageCount}</div>
+        <div class="detail-item-sub">User turns</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Tokens</div>
+        <div class="detail-item-value">${formatNumber(node.tokens)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Cost</div>
+        <div class="detail-item-value">$${(node.cost || 0).toFixed(4)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Duration</div>
+        <div class="detail-item-value" style="font-size:0.9rem">${duration}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Last Updated</div>
+        <div class="detail-item-value" style="font-size:0.75rem">${updated}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">Session Key</div>
+        <div class="detail-item-value" style="font-size:0.65rem; word-break:break-all">${node.key}</div>
+      </div>
+    </div>
+  `;
+  
+  if (node.children && node.children.length > 0) {
+    html += `
+      <div class="detail-section">
+        <div class="detail-heading">Child Sessions (${node.children.length})</div>
+        <div class="child-list">
+    `;
+    
+    for (const child of node.children) {
+      html += `
+        <div class="child-item">
+          <span class="child-label">${child.agentEmoji} ${child.label}</span>
+          <div class="child-meta">
+            <span>${formatNumber(child.tokens)} tok</span>
+            <span>$${(child.cost || 0).toFixed(4)}</span>
+          </div>
+        </div>
+      `;
+    }
+    
+    html += `
+        </div>
+      </div>
+    `;
+  }
+  
+  panel.innerHTML = html;
+  panel.style.display = 'block';
+  
+  // Scroll to panel
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+
+function formatNumber(n) {
+  if (n > 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n > 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+
+function formatDuration(ms) {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 3600000) return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return `${h}h ${m}m`;
+}
+
+function truncate(str, max) {
+  if (str.length <= max) return str;
+  return str.slice(0, max - 1) + '…';
+}
+
+</script>
+<script src="/lucide.min.js"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>
