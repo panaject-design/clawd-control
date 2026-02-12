@@ -13,6 +13,7 @@ import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
+import os from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -304,26 +305,49 @@ export class AgentCollector extends EventEmitter {
 
   _collectHostMetrics() {
     try {
-      const loadavg = readFileSync('/proc/loadavg', 'utf8').trim().split(' ');
-      const meminfo = readFileSync('/proc/meminfo', 'utf8');
-      const memTotal = parseInt(meminfo.match(/MemTotal:\s+(\d+)/)?.[1] || '0') * 1024;
-      const memAvail = parseInt(meminfo.match(/MemAvailable:\s+(\d+)/)?.[1] || '0') * 1024;
+      const memTotal = os.totalmem();
+      const memFree = os.freemem();
 
+      // Load average: os.loadavg() works on Linux/macOS; returns [0,0,0] on Windows
+      let loadAvg = os.loadavg();
+
+      // On Windows, compute a simple CPU usage % as a substitute for load average
+      if (process.platform === 'win32' && loadAvg[0] === 0) {
+        const cpus = os.cpus();
+        const avg = cpus.reduce((sum, cpu) => {
+          const total = Object.values(cpu.times).reduce((a, b) => a + b, 0);
+          return sum + (1 - cpu.times.idle / total);
+        }, 0) / cpus.length;
+        loadAvg = [Math.round(avg * cpus.length * 100) / 100, 0, 0];
+      }
+
+      // Disk usage: platform-specific
       let diskTotal = 0, diskUsed = 0;
       try {
-        const df = execSync('df -B1 / 2>/dev/null', { encoding: 'utf8' });
-        const parts = df.split('\n')[1]?.split(/\s+/);
-        if (parts) { diskTotal = parseInt(parts[1]) || 0; diskUsed = parseInt(parts[2]) || 0; }
+        if (process.platform === 'win32') {
+          // Use PowerShell to get disk space for the C: drive
+          const ps = execSync(
+            'powershell -NoProfile -Command "(Get-PSDrive C).Used,(Get-PSDrive C).Free"',
+            { encoding: 'utf8', shell: true }
+          );
+          const nums = ps.trim().split(/\r?\n/).map(Number);
+          if (nums.length >= 2 && nums[0] > 0) {
+            diskUsed = nums[0];
+            diskTotal = nums[0] + nums[1];
+          }
+        } else {
+          const df = execSync('df -B1 / 2>/dev/null', { encoding: 'utf8' });
+          const parts = df.split('\n')[1]?.split(/\s+/);
+          if (parts) { diskTotal = parseInt(parts[1]) || 0; diskUsed = parseInt(parts[2]) || 0; }
+        }
       } catch {}
 
-      const uptime = parseFloat(readFileSync('/proc/uptime', 'utf8').split(' ')[0]);
-
       this.hostMetrics = {
-        ts: Date.now(), hostname: execSync('hostname', { encoding: 'utf8' }).trim(),
-        loadAvg: loadavg.slice(0, 3).map(Number),
-        memory: { total: memTotal, used: memTotal - memAvail, available: memAvail },
+        ts: Date.now(), hostname: os.hostname(),
+        loadAvg,
+        memory: { total: memTotal, used: memTotal - memFree, available: memFree },
         disk: { total: diskTotal, used: diskUsed },
-        uptime: Math.floor(uptime),
+        uptime: Math.floor(os.uptime()),
       };
       this.emit('hostMetrics', this.hostMetrics);
     } catch {}

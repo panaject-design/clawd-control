@@ -899,9 +899,16 @@ body.sidebar-collapsed .topbar { grid-column: 1 / -1; }
         const text = script.textContent;
         // Skip if it's just lucide init
         if (text.trim() === 'lucide.createIcons();') continue;
-        // Skip layout.js related
-        if (text.includes('layout.js')) continue;
         try { new Function(text)(); } catch (e) { console.warn('[SPA] script error:', e); }
+      }
+
+      // Replay cached SSE state so new page listeners get data immediately
+      // (The SSE snapshot was already dispatched to old listeners before they were aborted)
+      if (Object.keys(agentState).length > 0) {
+        document.dispatchEvent(new CustomEvent('layout:snapshot'));
+      }
+      if (window.hostState && window.hostState.memory) {
+        document.dispatchEvent(new CustomEvent('layout:host-update'));
       }
 
       // Re-highlight active sidebar item
