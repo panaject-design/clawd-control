@@ -13,9 +13,10 @@ import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const DIR = new URL('.', import.meta.url).pathname;
+const DIR = dirname(fileURLToPath(import.meta.url));
 
 export class AgentCollector extends EventEmitter {
   constructor(configPath) {
