@@ -15,7 +15,7 @@ The following files contain our patches on top of upstream. During merges, prese
 - **`server.mjs`** — `fileURLToPath()` + `dirname()` for Windows paths; `runCLI()` helper with `shell:true` on Windows so `execFileSync` can find npm-installed `.cmd` wrappers; all `clawdbot` refs → `openclaw`, all `.clawdbot/` → `.openclaw/`
 - **`create-agent.mjs`** — Same `runCLI()` helper + Windows path fix; replaced `pgrep`/`kill -USR1` Linux commands with `openclaw gateway reload`; all `clawdbot` refs → `openclaw`
 - **`discover.mjs`** — Uses `~/.openclaw/openclaw.json` (not `~/.clawdbot/clawdbot.json`), port fallback, `localhost` instead of `127.0.0.1`
-- **`collector.mjs`** — Client ID `gateway-client`, origin header, platform `win32`
+- **`collector.mjs`** — `fileURLToPath()` + `dirname()` Windows path fix (was causing "Connecting to agents..." hang); client ID `gateway-client`, origin header, platform `win32`
 - **`check.mjs`** — Config path `.clawdbot/clawdbot.json` → `.openclaw/openclaw.json`
 - **`security-lib/checks/gateway.js`** — Config path `.clawdbot/clawdbot.json` → `.openclaw/openclaw.json`
 
