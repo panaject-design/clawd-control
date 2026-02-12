@@ -12,9 +12,12 @@ This is a **fork** of `Temaki-AI/clawd-control` with Windows and SPA bug fixes.
 The following files contain our patches on top of upstream. During merges, preserve these changes:
 
 ### Server-side (Windows-specific)
-- **`server.mjs`** (lines 12-13, 22) — `fileURLToPath()` + `dirname()` instead of `new URL().pathname` to fix doubled Windows paths (`C:\C:\...`)
+- **`server.mjs`** — `fileURLToPath()` + `dirname()` for Windows paths; `runCLI()` helper with `shell:true` on Windows so `execFileSync` can find npm-installed `.cmd` wrappers; all `clawdbot` refs → `openclaw`, all `.clawdbot/` → `.openclaw/`
+- **`create-agent.mjs`** — Same `runCLI()` helper + Windows path fix; replaced `pgrep`/`kill -USR1` Linux commands with `openclaw gateway reload`; all `clawdbot` refs → `openclaw`
 - **`discover.mjs`** — Uses `~/.openclaw/openclaw.json` (not `~/.clawdbot/clawdbot.json`), port fallback, `localhost` instead of `127.0.0.1`
 - **`collector.mjs`** — Client ID `gateway-client`, origin header, platform `win32`
+- **`check.mjs`** — Config path `.clawdbot/clawdbot.json` → `.openclaw/openclaw.json`
+- **`security-lib/checks/gateway.js`** — Config path `.clawdbot/clawdbot.json` → `.openclaw/openclaw.json`
 
 ### Frontend (all platforms — SPA navigation fixes)
 - **`layout.js`** — `cache: 'no-store'` on SPA fetch, AbortController cleanup for page listeners
@@ -49,6 +52,8 @@ git push origin main
 
 ### Conflict resolution rules
 - If upstream modifies the same lines we patched, **keep our fix** unless the upstream change makes our fix unnecessary
+- If upstream adds new `execFileSync('clawdbot', ...)` calls, change to `runCLI([...])` and rename `clawdbot` → `openclaw`
+- If upstream adds new `.clawdbot/` paths, change to `.openclaw/`
 - If upstream adds new pages with `onclick` handlers, add `window.functionName = functionName` exports
 - If upstream adds new event listeners in page scripts, add `{ signal: window._pageAbort.signal }` option
 
