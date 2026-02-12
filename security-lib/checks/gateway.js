@@ -4,7 +4,7 @@ const os = require('os');
 
 function checkGatewayConfig() {
   const results = [];
-  const configPath = path.join(os.homedir(), '.clawdbot', 'clawdbot.json');
+  const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json');
   if (!fs.existsSync(configPath)) {
     results.push({ name: 'Gateway config', status: 'warn', detail: 'Config file not found' });
     return results;

@@ -1,5 +1,5 @@
 /**
- * Auto-discover agents from ~/.clawdbot/clawdbot.json
+ * Auto-discover agents from ~/.openclaw/openclaw.json
  * Fallback when agents.json doesn't exist.
  *
  * Reads the gateway config to find:
@@ -13,11 +13,11 @@ import { join } from 'path';
 import { homedir } from 'os';
 
 export function discoverAgents() {
-  const clawdbotDir = join(homedir(), '.openclaw');
-  const configPath = join(clawdbotDir, 'openclaw.json');
+  const openclawDir = join(homedir(), '.openclaw');
+  const configPath = join(openclawDir, 'openclaw.json');
 
   if (!existsSync(configPath)) {
-    console.log('ℹ️  No ~/.clawdbot/openclaw.json found. Create agents.json manually.');
+    console.log('ℹ️  No ~/.openclaw/openclaw.json found. Create agents.json manually.');
     return { agents: [], pollIntervalMs: 15000, hostMetricsIntervalMs: 30000 };
   }
 
@@ -94,8 +94,8 @@ export function discoverAgents() {
   }
 
   if (discovered.length === 0) {
-    // Fallback: scan ~/.clawdbot/agents/ directory for agent subdirs
-    const agentsDir = join(clawdbotDir, 'agents');
+    // Fallback: scan ~/.openclaw/agents/ directory for agent subdirs
+    const agentsDir = join(openclawDir, 'agents');
     if (existsSync(agentsDir)) {
       const subdirs = readdirSync(agentsDir).filter(name => {
         try { return statSync(join(agentsDir, name)).isDirectory(); }

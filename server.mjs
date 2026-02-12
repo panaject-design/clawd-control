@@ -22,6 +22,14 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 const PORT = parseInt(process.argv.find((_, i, a) => a[i - 1] === '--port') || '3100');
 const DIR = dirname(fileURLToPath(import.meta.url));
 
+// Windows fix: execFileSync can't find .cmd/.ps1 wrappers (e.g. npm-installed CLIs)
+// Adding shell:true lets the OS shell resolve them via PATH + PATHEXT
+const SHELL_OPTS = process.platform === 'win32' ? { shell: true } : {};
+
+function runCLI(args, opts = {}) {
+  return execFileSync('openclaw', args, { encoding: 'utf8', stdio: 'pipe', ...SHELL_OPTS, ...opts });
+}
+
 // ── Auth ─────────────────────────────────────────────
 // Password stored in auth.json. On first run, generates a random one.
 const AUTH_PATH = join(DIR, 'auth.json');
@@ -143,34 +151,34 @@ async function handleAgentAction(agentId, action) {
     switch (action) {
       case 'heartbeat-enable': {
         // Runtime toggle
-        execFileSync('clawdbot', ['system', 'heartbeat', 'enable'], { encoding: 'utf8', stdio: 'pipe' });
+        runCLI(['system', 'heartbeat', 'enable']);
         // Also persist via gateway config.patch
         try {
-          execFileSync('clawdbot', ['gateway', 'config.patch', '--json', JSON.stringify({
+          runCLI(['gateway', 'config.patch', '--json', JSON.stringify({
             agents: { defaults: { heartbeat: { every: '55m' } } }
-          })], { encoding: 'utf8', stdio: 'pipe' });
+          })]);
         } catch (_) { /* best effort */ }
         return { ok: true, message: `Heartbeat enabled for ${agentId}` };
       }
       case 'heartbeat-disable': {
         // Runtime toggle
-        execFileSync('clawdbot', ['system', 'heartbeat', 'disable'], { encoding: 'utf8', stdio: 'pipe' });
+        runCLI(['system', 'heartbeat', 'disable']);
         // Also persist via gateway config.patch
         try {
-          execFileSync('clawdbot', ['gateway', 'config.patch', '--json', JSON.stringify({
+          runCLI(['gateway', 'config.patch', '--json', JSON.stringify({
             agents: { defaults: { heartbeat: { every: 'off' } } }
-          })], { encoding: 'utf8', stdio: 'pipe' });
+          })]);
         } catch (_) { /* best effort */ }
         return { ok: true, message: `Heartbeat disabled for ${agentId}` };
       }
       case 'heartbeat-trigger': {
-        execFileSync('clawdbot', ['system', 'event', '--mode', 'now', '--text', 'Manual heartbeat trigger from Clawd Control'], { encoding: 'utf8', stdio: 'pipe' });
+        runCLI(['system', 'event', '--mode', 'now', '--text', 'Manual heartbeat trigger from Clawd Control']);
         return { ok: true, message: `Heartbeat triggered for ${agentId}` };
       }
       case 'session-new': {
         // Clear only the main session to start fresh (keeps other sessions)
         const mainAgentId = agentId === 'gandalf' ? 'main' : agentId;
-        const sessPath = join(process.env.HOME, '.clawdbot', 'agents', mainAgentId, 'sessions', 'sessions.json');
+        const sessPath = join(process.env.HOME, '.openclaw', 'agents', mainAgentId, 'sessions', 'sessions.json');
         if (existsSync(sessPath)) {
           const sessions = JSON.parse(readFileSync(sessPath, 'utf8'));
           const mainKey = `agent:${mainAgentId}:main`;
@@ -178,7 +186,7 @@ async function handleAgentAction(agentId, action) {
             // Backup the session transcript before clearing
             const sid = sessions[mainKey].sessionId;
             if (sid) {
-              const transcript = join(process.env.HOME, '.clawdbot', 'agents', mainAgentId, 'sessions', `${sid}.jsonl`);
+              const transcript = join(process.env.HOME, '.openclaw', 'agents', mainAgentId, 'sessions', `${sid}.jsonl`);
               if (existsSync(transcript)) {
                 const bak = transcript.replace('.jsonl', `.archived.${Date.now()}.jsonl`);
                 copyFileSync(transcript, bak);
@@ -193,7 +201,7 @@ async function handleAgentAction(agentId, action) {
       case 'session-reset': {
         // Delete ALL sessions (nuclear option)
         const agentIdForPath = agentId === 'gandalf' ? 'main' : agentId;
-        const sessionPath = join(process.env.HOME, '.clawdbot', 'agents', agentIdForPath, 'sessions', 'sessions.json');
+        const sessionPath = join(process.env.HOME, '.openclaw', 'agents', agentIdForPath, 'sessions', 'sessions.json');
         if (existsSync(sessionPath)) {
           const backup = sessionPath + '.bak.' + Date.now();
           copyFileSync(sessionPath, backup);
@@ -354,7 +362,7 @@ function getAgentDetail(agentId) {
 import { homedir } from 'os';
 
 function getAnalytics(rangeStr, agentFilter) {
-  const AGENTS_DIR = join(homedir(), '.clawdbot', 'agents');
+  const AGENTS_DIR = join(homedir(), '.openclaw', 'agents');
   const range = rangeStr === 'all' ? Infinity : parseInt(rangeStr);
   const cutoffDate = rangeStr === 'all' ? 0 : Date.now() - (range * 86400000);
 
@@ -550,7 +558,7 @@ function getAnalytics(rangeStr, agentFilter) {
 
 // ── Token Analytics (granular breakdown by day and agent) ──
 function getTokenAnalytics(rangeStr, agentFilter) {
-  const AGENTS_DIR = join(homedir(), '.clawdbot', 'agents');
+  const AGENTS_DIR = join(homedir(), '.openclaw', 'agents');
   const range = rangeStr === 'all' ? Infinity : parseInt(rangeStr);
   const cutoffDate = rangeStr === 'all' ? 0 : Date.now() - (range * 86400000);
 
@@ -710,7 +718,7 @@ function getTokenAnalytics(rangeStr, agentFilter) {
 // ── Session Trace (for waterfall view) ─────────────
 
 function getAllSessions() {
-  const AGENTS_DIR = join(homedir(), '.clawdbot', 'agents');
+  const AGENTS_DIR = join(homedir(), '.openclaw', 'agents');
   const sessions = [];
 
   try {
@@ -753,7 +761,7 @@ function getAllSessions() {
 }
 
 function getSessionTrace(sessionKey) {
-  const AGENTS_DIR = join(homedir(), '.clawdbot', 'agents');
+  const AGENTS_DIR = join(homedir(), '.openclaw', 'agents');
   
   // Find the session file
   let sessionFile = null;
@@ -917,7 +925,7 @@ function getSessionTrace(sessionKey) {
 // ── Traces (delegation trees) ──────────────────────
 
 function getTraces() {
-  const AGENTS_DIR = join(homedir(), '.clawdbot', 'agents');
+  const AGENTS_DIR = join(homedir(), '.openclaw', 'agents');
   const traces = [];
   const sessionMap = new Map(); // sessionKey -> session metadata
 
@@ -1199,8 +1207,7 @@ const server = createServer((req, res) => {
   // ── Crons ──
   if (path === '/api/crons' && req.method === 'GET') {
     try {
-      const clawdbotBin = join(process.execPath, '..', 'clawdbot');
-      const output = execFileSync(clawdbotBin, ['cron', 'list', '--json'], { encoding: 'utf8', stdio: 'pipe', timeout: 10000 });
+      const output = runCLI(['cron', 'list', '--json'], { timeout: 10000 });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(output);
     } catch (e) {

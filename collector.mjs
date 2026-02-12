@@ -2,7 +2,7 @@
 /**
  * Clawd Control — Agent Collector
  * 
- * Connects to each agent's Clawdbot gateway via the native WS protocol,
+ * Connects to each agent's Openclaw gateway via the native WS protocol,
  * polls status data, and exposes an event emitter for the server.
  * 
  * Supports multiple agents on the same gateway: connects once per
