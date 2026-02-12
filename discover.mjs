@@ -13,11 +13,11 @@ import { join } from 'path';
 import { homedir } from 'os';
 
 export function discoverAgents() {
-  const clawdbotDir = join(homedir(), '.clawdbot');
-  const configPath = join(clawdbotDir, 'clawdbot.json');
+  const clawdbotDir = join(homedir(), '.openclaw');
+  const configPath = join(clawdbotDir, 'openclaw.json');
 
   if (!existsSync(configPath)) {
-    console.log('ℹ️  No ~/.clawdbot/clawdbot.json found. Create agents.json manually.');
+    console.log('ℹ️  No ~/.clawdbot/openclaw.json found. Create agents.json manually.');
     return { agents: [], pollIntervalMs: 15000, hostMetricsIntervalMs: 30000 };
   }
 
@@ -30,7 +30,7 @@ export function discoverAgents() {
   }
 
   // Gateway connection
-  const port = config.gateway?.loopback?.port || 18789;
+  const port = config.gateway?.loopback?.port || config.gateway?.port || 18789;
   const token = config.gateway?.auth?.token || '';
   if (!token) {
     console.warn('⚠️  No gateway auth token found in config.');
@@ -84,7 +84,7 @@ export function discoverAgents() {
       gatewayAgentId: id,
       name,
       emoji,
-      host: '127.0.0.1',
+      host: 'localhost',
       port,
       token,
       workspace,
@@ -107,7 +107,7 @@ export function discoverAgents() {
           gatewayAgentId: agentId,
           name: agentId.charAt(0).toUpperCase() + agentId.slice(1),
           emoji: '🤖',
-          host: '127.0.0.1',
+          host: 'localhost',
           port,
           token,
           workspace: agentId === 'main' ? defaultWorkspace : join(defaultWorkspace, '..', 'clawd-agents', agentId),

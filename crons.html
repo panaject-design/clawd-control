@@ -395,10 +395,11 @@ let refreshInterval = null;
 // INIT
 // ═══════════════════════════════════════════
 
+if (!window._pageAbort) window._pageAbort = new AbortController();
 document.addEventListener('layout:snapshot', () => {
   populateAgentFilter();
   loadCrons();
-});
+}, { signal: window._pageAbort.signal });
 
 // Also load immediately — don't wait for SSE snapshot
 setTimeout(() => {
@@ -1008,6 +1009,12 @@ function parseCronField(field, min, max) {
   
   return values;
 }
+
+// Expose functions to window for SPA navigation (new Function() runs in local scope)
+window.setView = setView;
+window.changeMonth = changeMonth;
+window.toggleJob = toggleJob;
+window.scrollToJob = scrollToJob;
 
 </script>
 <script src="/lucide.min.js"></script>

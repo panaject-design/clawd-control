@@ -293,10 +293,11 @@ function getAgentColor(agentId) {
 // INIT
 // ═══════════════════════════════════════════
 
+if (!window._pageAbort) window._pageAbort = new AbortController();
 document.addEventListener('layout:snapshot', () => {
   populateAgentSelect();
   loadTraces();
-});
+}, { signal: window._pageAbort.signal });
 
 // Also load immediately
 setTimeout(() => {
@@ -836,6 +837,9 @@ function truncate(str, max) {
   if (str.length <= max) return str;
   return str.slice(0, max - 1) + '…';
 }
+
+// Expose functions to window for SPA navigation (new Function() runs in local scope)
+window.setViewMode = setViewMode;
 
 </script>
 <script src="/lucide.min.js"></script>

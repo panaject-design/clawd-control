@@ -9,7 +9,8 @@
 import http from 'http';
 const { createServer } = http;
 import { readFileSync, existsSync, writeFileSync, copyFileSync, readdirSync, statSync } from 'fs';
-import { join, extname } from 'path';
+import { join, dirname, extname } from 'path';
+import { fileURLToPath } from 'url';
 import { gzipSync } from 'zlib';
 import { execFileSync } from 'child_process';
 import { AgentCollector } from './collector.mjs';
@@ -19,7 +20,7 @@ import { discoverAgents } from './discover.mjs';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 
 const PORT = parseInt(process.argv.find((_, i, a) => a[i - 1] === '--port') || '3100');
-const DIR = new URL('.', import.meta.url).pathname;
+const DIR = dirname(fileURLToPath(import.meta.url));
 
 // ── Auth ─────────────────────────────────────────────
 // Password stored in auth.json. On first run, generates a random one.

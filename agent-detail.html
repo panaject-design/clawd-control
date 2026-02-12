@@ -757,6 +757,11 @@ function fmtBytes(b) {
 }
 function fmtNum(n) { return n.toLocaleString(); }
 
+// Expose functions to window for SPA navigation (new Function() runs in local scope)
+window.switchTab = switchTab;
+window.doAction = doAction;
+window.runSecurityAudit = runSecurityAudit;
+
 load();
 </script>
 </main>

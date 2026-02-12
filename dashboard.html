@@ -261,18 +261,22 @@ const $ = s => document.querySelector(s);
 // SSE EVENT LISTENERS (from layout.js)
 // ═══════════════════════════════════════════
 
-document.addEventListener('layout:snapshot', () => renderAll());
+if (!window._pageAbort) window._pageAbort = new AbortController();
+const signal = window._pageAbort.signal;
+document.addEventListener('layout:snapshot', () => renderAll(), { signal });
 document.addEventListener('layout:agent-update', (e) => {
   renderAgent(e.detail.id);
   renderStats();
-});
-document.addEventListener('layout:host-update', () => renderHost());
+}, { signal });
+document.addEventListener('layout:host-update', () => renderHost(), { signal });
+
 
 // ═══════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════
 
 function renderAll() {
+  if (!$('#agentGrid')) return;  // not on dashboard page
   renderHost();
   renderStats();
   renderFleetHealth();
@@ -297,6 +301,7 @@ function renderAll() {
 }
 
 function renderStats() {
+  if (!$('#statTotal')) return;  // not on dashboard page
   const ids = Object.keys(agentState);
   const total = ids.length;
   const online = ids.filter(id => agentState[id].online).length;
@@ -327,6 +332,7 @@ function renderStats() {
 }
 
 function renderHost() {
+  if (!$('#hostBar')) return;    // not on dashboard page
   const h = window.hostState;
   if (!h || !h.memory) return;
   const memPct = Math.round(h.memory.used / h.memory.total * 100);
@@ -342,6 +348,7 @@ function renderHost() {
 }
 
 function renderFleetHealth() {
+  if (!$('#breakdownBar')) return;  // not on dashboard page
   const ids = Object.keys(agentState);
   if (ids.length === 0) return;
 
@@ -370,11 +377,13 @@ function renderFleetHealth() {
 }
 
 function renderAgent(id) {
+  const grid = $('#agentGrid');
+  if (!grid) return;           // not on dashboard page (SPA navigated away)
   let card = $(`#card-${id}`);
   if (!card) {
     card = document.createElement('article');
     card.id = `card-${id}`;
-    $('#agentGrid').appendChild(card);
+    grid.appendChild(card);
   }
   const a = agentState[id];
   if (!a) return;
@@ -555,6 +564,19 @@ function confirmAction(id, action, message) {
 function barHtml(pct) {
   const cls = pct > 90 ? 'crit' : pct > 70 ? 'warn' : 'ok';
   return `<span class="bar-track"><span class="bar-fill ${cls}" style="width:${pct}%"></span></span>`;
+}
+
+// Expose functions to window for SPA navigation (new Function() runs in local scope)
+window.agentAction = agentAction;
+window.confirmAction = confirmAction;
+window.renderAll = renderAll;
+window.renderAgent = renderAgent;
+window.renderStats = renderStats;
+window.renderHost = renderHost;
+
+// If data already available (SPA navigation back), render immediately
+if (window.agentState && Object.keys(window.agentState).length > 0) {
+  renderAll();
 }
 </script>
 <script src="/lucide.min.js"></script>

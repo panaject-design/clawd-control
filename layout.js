@@ -854,7 +854,7 @@ body.sidebar-collapsed .topbar { grid-column: 1 / -1; }
 
   async function spaNavigate(href, pushState = true) {
     try {
-      const res = await fetch(href, { credentials: 'same-origin' });
+      const res = await fetch(href, { credentials: 'same-origin', cache: 'no-store' });
       if (!res.ok || res.redirected) { window.location.href = href; return; }
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('text/html')) { window.location.href = href; return; }
@@ -876,6 +876,10 @@ body.sidebar-collapsed .topbar { grid-column: 1 / -1; }
       } else if (newPageStyle) {
         document.head.appendChild(newPageStyle);
       }
+
+      // Clean up page-specific event listeners from previous page
+      if (window._pageAbort) window._pageAbort.abort();
+      window._pageAbort = new AbortController();
 
       // Swap main content
       const currentMain = document.querySelector('main.main') || document.querySelector('main');

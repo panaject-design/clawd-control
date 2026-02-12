@@ -327,10 +327,11 @@ let tokenData = null;
 // INIT
 // ═══════════════════════════════════════════
 
+if (!window._pageAbort) window._pageAbort = new AbortController();
 document.addEventListener('layout:snapshot', () => {
   populateAgentSelect();
   loadTokens();
-});
+}, { signal: window._pageAbort.signal });
 
 // Also load immediately — don't wait for SSE snapshot
 setTimeout(() => {
