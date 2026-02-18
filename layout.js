@@ -38,11 +38,13 @@
                 ? 'traces'
                 : path === '/crons.html'
                   ? 'crons'
-                  : path.startsWith('/agent/')
-                    ? 'agent-detail'
-                    : path === '/gandalf-view.html'
-                      ? 'gandalf'
-                      : 'other';
+                  : path === '/fleet.html'
+                    ? 'fleet'
+                    : path.startsWith('/agent/')
+                      ? 'agent-detail'
+                      : path === '/gandalf-view.html'
+                        ? 'gandalf'
+                        : 'other';
   const activeAgentId =
     activePage === 'agent-detail'
       ? decodeURIComponent(path.split('/').filter(Boolean).pop())
@@ -434,6 +436,10 @@ body.sidebar-collapsed .topbar { grid-column: 1 / -1; }
       </div>
 
       <div class="sidebar-section">Tools</div>
+      <a href="/fleet.html" class="nav-item${isActive('fleet')}">
+        <i data-lucide="users" class="nav-icon"></i>
+        <span class="nav-label">Fleet Matrix</span>
+      </a>
       <a href="/analytics.html" class="nav-item${isActive('analytics')}">
         <i data-lucide="bar-chart-3" class="nav-icon"></i>
         <span class="nav-label">Cost Analytics</span>

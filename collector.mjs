@@ -37,6 +37,13 @@ export class AgentCollector extends EventEmitter {
 
   loadConfig() {
     this.config = JSON.parse(readFileSync(this.configPath, 'utf8'));
+    // Support env var override for gateway token (avoids plaintext in agents.json)
+    const envToken = process.env.CC_GATEWAY_TOKEN;
+    if (envToken) {
+      for (const agent of this.config.agents) {
+        if (!agent.token || agent.token === 'ENV') agent.token = envToken;
+      }
+    }
     const currentIds = new Set(this.config.agents.map(a => a.id));
 
     // Prune agents that were removed from config
@@ -72,6 +79,7 @@ export class AgentCollector extends EventEmitter {
           machine: agent.machine, online: false, lastSeen: null,
           health: null, sessions: null, usage: null, heartbeat: null,
           presence: null, channels: null, cron: null, error: null,
+          healthHistory: [], // Track last 24 connection status checks (1 per poll)
         });
       }
     }
@@ -180,8 +188,10 @@ export class AgentCollector extends EventEmitter {
           type: 'req', id: String(++this._reqCounter), method: 'connect',
           params: {
             minProtocol: 3, maxProtocol: 3,
-            client: { id: 'gateway-client', version: '2.0.0', platform: 'win32', mode: 'backend' },
+            client: { id: 'openclaw-probe', version: '2.0.0', platform: process.platform, mode: 'probe' },
             auth: { token: gw.token },
+            role: 'operator',
+            scopes: ['operator.read'],
           },
         });
         return;
@@ -297,7 +307,21 @@ export class AgentCollector extends EventEmitter {
 
   _updateState(id, partial) {
     const current = this.state.get(id) || {};
-    this.state.set(id, { ...current, ...partial });
+    const updated = { ...current, ...partial };
+    
+    // Track health history (last 24 status checks)
+    if (partial.online !== undefined || partial.error !== undefined) {
+      const history = updated.healthHistory || [];
+      const status = updated.online ? 'ok' : 'fail';
+      const ts = Date.now();
+      history.push({ ts, status });
+      
+      // Keep only last 24 entries
+      if (history.length > 24) history.shift();
+      updated.healthHistory = history;
+    }
+    
+    this.state.set(id, updated);
     this.emit('update', { id, state: this.state.get(id) });
   }
 

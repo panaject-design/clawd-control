@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Comparison — Clawd Control</title>
+<style>
+  /* Fleet Comparison Matrix */
+  .fleet-container {
+    padding: 24px;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .fleet-header {
+    margin-bottom: 24px;
+  }
+
+  .fleet-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+  }
+
+  .fleet-header p {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  .fleet-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .fleet-table thead {
+    background: var(--bg-secondary);
+    border-bottom: 2px solid var(--border);
+  }
+
+  .fleet-table th {
+    padding: 12px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-tertiary);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .fleet-table th.agent-col {
+    position: sticky;
+    left: 0;
+    background: var(--bg-secondary);
+    z-index: 2;
+    min-width: 180px;
+  }
+
+  .fleet-table tbody tr {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .fleet-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .fleet-table tbody tr:hover {
+    background: var(--surface-hover);
+  }
+
+  .fleet-table td {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+
+  .fleet-table td.agent-col {
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 1;
+    font-weight: 600;
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  .fleet-table tbody tr:hover td.agent-col {
+    background: var(--surface-hover);
+  }
+
+  .agent-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .agent-emoji {
+    font-size: 20px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .status-badge.online {
+    background: var(--success-bg);
+    color: var(--success);
+  }
+
+  .status-badge.offline {
+    background: var(--error-bg);
+    color: var(--error);
+  }
+
+  .skill-list, .cred-list, .tool-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .skill-pill, .cred-pill, .tool-pill {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .skill-pill {
+    background: var(--accent-bg);
+    color: var(--accent);
+  }
+
+  .cred-pill {
+    background: var(--info-bg);
+    color: var(--info);
+  }
+
+  .model-cell {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  .count-cell {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .gap-indicator {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--warning-bg);
+    color: var(--warning);
+  }
+
+  .no-gap {
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+
+  .loading-state {
+    text-align: center;
+    padding: 80px;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+<main class="main">
+  <div class="fleet-container">
+    <div class="fleet-header">
+      <h1>🗂️ Fleet Comparison Matrix</h1>
+      <p>Side-by-side comparison of all agents: skills, credentials, tools, model, and status</p>
+    </div>
+
+    <div id="fleetContent">
+      <div class="loading-state">
+        <div style="font-size:2rem;margin-bottom:12px">📊</div>
+        <p>Loading fleet data...</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/layout.js"></script>
+<script>
+'use strict';
+
+let agentsData = [];
+
+async function load() {
+  try {
+    // Fetch snapshot with agent states
+    const snapshot = await fetch('/api/snapshot').then(r => r.json());
+    
+    // Fetch detailed data for each agent
+    const agentIds = Object.keys(snapshot.agents || {});
+    const detailPromises = agentIds.map(id => 
+      fetch(`/api/agents/${id}/detail`).then(r => r.ok ? r.json() : null)
+    );
+    
+    const details = await Promise.all(detailPromises);
+    
+    // Combine snapshot + detail
+    agentsData = agentIds.map((id, i) => {
+      const state = snapshot.agents[id];
+      const detail = details[i];
+      return { id, state, detail };
+    }).filter(a => a.detail);
+    
+    render();
+  } catch (e) {
+    document.getElementById('fleetContent').innerHTML = `
+      <div class="loading-state">
+        <div style="font-size:2rem;margin-bottom:12px">❌</div>
+        <p>Error loading fleet data: ${e.message}</p>
+      </div>
+    `;
+  }
+}
+
+function render() {
+  if (agentsData.length === 0) {
+    document.getElementById('fleetContent').innerHTML = `
+      <div class="loading-state">
+        <div style="font-size:2rem;margin-bottom:12px">📭</div>
+        <p>No agents configured</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Build comparison table
+  const html = `
+    <table class="fleet-table">
+      <thead>
+        <tr>
+          <th class="agent-col">Agent</th>
+          <th>Status</th>
+          <th>Model</th>
+          <th>Skills</th>
+          <th>Credentials</th>
+          <th>Sessions</th>
+          <th>Cron Jobs</th>
+          <th>Tools</th>
+          <th>Channels</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${agentsData.map(renderAgentRow).join('')}
+      </tbody>
+    </table>
+    
+    <div style="margin-top:24px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md)">
+      <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text-primary)">
+        <i data-lucide="alert-triangle" style="width:14px;height:14px;vertical-align:middle"></i>
+        Capability Gaps
+      </h3>
+      ${renderCapabilityGaps()}
+    </div>
+  `;
+  
+  document.getElementById('fleetContent').innerHTML = html;
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function renderAgentRow(agent) {
+  const { id, state, detail } = agent;
+  const online = state.online;
+  const model = extractModel(state);
+  const skills = detail.skills || [];
+  const creds = detail.credentials || [];
+  const sessions = state.sessions?.sessions || [];
+  const cronJobs = extractCronCount(state);
+  const channels = extractChannels(state);
+  
+  // Extract tools from TOOLS.md
+  const toolsText = detail.workspace?.tools || '';
+  const toolLines = toolsText.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('*'));
+  
+  return `
+    <tr onclick="window.location.href='/agent/${id}'" style="cursor:pointer">
+      <td class="agent-col">
+        <div class="agent-name-cell">
+          <span class="agent-emoji">${state.emoji || '🤖'}</span>
+          <span>${state.name || id}</span>
+        </div>
+      </td>
+      <td>
+        <span class="status-badge ${online ? 'online' : 'offline'}">
+          ${online ? '● Online' : '○ Offline'}
+        </span>
+      </td>
+      <td class="model-cell">${model}</td>
+      <td>
+        <div class="count-cell">${skills.length}</div>
+        <div class="skill-list" style="margin-top:4px">
+          ${skills.slice(0, 3).map(s => `<span class="skill-pill">${esc(s.name)}</span>`).join('')}
+          ${skills.length > 3 ? `<span class="skill-pill">+${skills.length - 3}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <div class="count-cell">${creds.length}</div>
+        <div class="cred-list" style="margin-top:4px">
+          ${creds.slice(0, 3).map(c => `<span class="cred-pill">${esc(c.name)}</span>`).join('')}
+          ${creds.length > 3 ? `<span class="cred-pill">+${creds.length - 3}</span>` : ''}
+        </div>
+      </td>
+      <td class="count-cell">${sessions.length}</td>
+      <td class="count-cell">${cronJobs}</td>
+      <td class="count-cell">${toolLines.length}</td>
+      <td>
+        <div class="count-cell">${channels.length}</div>
+      </td>
+    </tr>
+  `;
+}
+
+function renderCapabilityGaps() {
+  // Analyze capability gaps
+  const allSkills = new Set();
+  const allCreds = new Set();
+  
+  agentsData.forEach(a => {
+    (a.detail.skills || []).forEach(s => allSkills.add(s.name));
+    (a.detail.credentials || []).forEach(c => allCreds.add(c.name));
+  });
+  
+  const gaps = [];
+  
+  // Find agents missing common skills
+  allSkills.forEach(skill => {
+    const agentsWithout = agentsData.filter(a => 
+      !(a.detail.skills || []).some(s => s.name === skill)
+    );
+    if (agentsWithout.length > 0 && agentsWithout.length < agentsData.length) {
+      gaps.push({
+        type: 'skill',
+        name: skill,
+        missing: agentsWithout.map(a => a.state.name || a.id)
+      });
+    }
+  });
+  
+  // Find agents missing common credentials
+  allCreds.forEach(cred => {
+    const agentsWithout = agentsData.filter(a => 
+      !(a.detail.credentials || []).some(c => c.name === cred)
+    );
+    if (agentsWithout.length > 0 && agentsWithout.length < agentsData.length) {
+      gaps.push({
+        type: 'credential',
+        name: cred,
+        missing: agentsWithout.map(a => a.state.name || a.id)
+      });
+    }
+  });
+  
+  if (gaps.length === 0) {
+    return '<p class="no-gap">No significant capability gaps detected. All agents have consistent tooling.</p>';
+  }
+  
+  return gaps.map(gap => `
+    <div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid var(--border-subtle)">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">
+        <span class="gap-indicator">${gap.type}</span>
+        <span style="margin-left:8px;font-family:var(--font-mono)">${esc(gap.name)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary)">
+        Missing from: ${gap.missing.join(', ')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// Helper functions
+function extractModel(state) {
+  const clean = m => m.replace('anthropic/', '').replace('openai/', '');
+  if (state.health?.config?.defaultModel) return clean(state.health.config.defaultModel);
+  const sessions = state.sessions?.sessions || [];
+  for (const s of sessions) if (s.model) return clean(s.model);
+  return '—';
+}
+
+function extractCronCount(state) {
+  if (!state.cron) return 0;
+  const list = Array.isArray(state.cron) ? state.cron : (state.cron.jobs || []);
+  return list.filter(j => j.enabled !== false).length;
+}
+
+function extractChannels(state) {
+  if (!state.channels) return [];
+  const list = Array.isArray(state.channels) ? state.channels : (state.channels.channels || []);
+  return list;
+}
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Load on page ready
+load();
+</script>
+<script src="/lucide.min.js"></script>
+<script>if (window.lucide) window.lucide.createIcons();</script>
+</body>
+</html>
